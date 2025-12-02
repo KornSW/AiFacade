@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Logging.SmartStandards.CopyForAiFacade;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Linq;
@@ -46,7 +47,7 @@ namespace AI.KornSW.Providers {
 
       var jsonBody = JsonConvert.SerializeObject(requestBody);
 
-      using (HttpClient client = new HttpClient()) { 
+      using (HttpClient client = new HttpClient()) {
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _OpenAiApiKey);
 
         var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
@@ -270,16 +271,24 @@ namespace AI.KornSW.Providers {
         var content = new StringContent(openAiRequestJson, Encoding.UTF8, "application/json");
 
         var response = client.PostAsync(endpoint, content).Result;
-        string responseContent = response.Content.ReadAsStringAsync().Result;
+        string responseContent = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
         try {
           var parsed = JObject.Parse(responseContent);
 
           // Suche nach dem assistant-Antwort-Element
-          var messageBlock = parsed["output"]?
-              .FirstOrDefault(o => o["type"]?.ToString() == "message");
+          JToken messageBlock = null;
+          if (parsed.ContainsKey("output") && parsed["output"].HasValues) {
+            messageBlock = parsed["output"]?.FirstOrDefault(o => o["type"]?.ToString() == "message");
+          }
+
+          string errorMessage = null;
+          if (parsed.ContainsKey("error") && parsed["error"].HasValues) {
+            errorMessage = parsed["error"]?["message"]?.ToString();
+          }
 
           var contentArray = messageBlock?["content"] as JArray;
+
           var outputText = contentArray?
               .FirstOrDefault(c => c["type"]?.ToString() == "output_text")?["text"]?.ToString();
 
@@ -299,7 +308,14 @@ namespace AI.KornSW.Providers {
           }
 
           if (string.IsNullOrWhiteSpace(outputText)) {
-            return null;
+
+            if (string.IsNullOrEmpty(errorMessage)) {
+              throw new Exception("Response does not contain 'outputText'");
+            }
+            else {
+              throw new Exception(errorMessage);
+            }
+
           }
           else if (t == typeof(string)) {
             return (outputText as T);
@@ -311,10 +327,11 @@ namespace AI.KornSW.Providers {
 
         }
         catch (Exception ex) {
-          // Für Logging oder Debug
-          Console.WriteLine("Fehler beim Parsen: " + ex.Message);
-          return null;
+          DevLogger.LogError(ex);
+          throw new Exception("Error while calling OpenAI services: " + ex.Message, ex);
         }
+
+
       }
     }
 
