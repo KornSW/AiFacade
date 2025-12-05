@@ -7,7 +7,13 @@ This files contains a version history including all changes relevant for semanti
 
 ## Upcoming Changes
 
-* Fix Markdown
+*(none)*
+
+
+
+## v 0.1.3
+released **2025-12-05**, including:
+ - Fix Markdown
 
 
 
