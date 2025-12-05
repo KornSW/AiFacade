@@ -318,7 +318,24 @@ namespace AI.KornSW.Providers {
 
           }
           else if (t == typeof(string)) {
-            return (outputText as T);
+            string text = (outputText as string);
+
+            //HACK: ekelhaft!
+            if (text.StartsWith("```markdown")) {
+              text = text.Substring(11);
+
+              if (text.StartsWith(Environment.NewLine)) {
+                text = text.Substring(Environment.NewLine.Length);
+              }
+              if (text.StartsWith("#")) {
+                text = text.Substring(1);
+              }
+              if (text.EndsWith("```")) {
+                text = text.Substring(0, text.Length - 3);
+              }
+            }
+
+            return (text as T);
           }
           else {
             string resultJson = ExtractJsonBlock(outputText);
